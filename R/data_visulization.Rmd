@@ -1,0 +1,157 @@
+---
+title: "day_8_data_viz"
+author: "Julia Parish"
+date: "8/18/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(here)
+library(janitor)
+
+
+library(ggrepel)
+library(patchwork)
+library(ggrepel)
+library(gghighlight)
+library(paletteer)
+library(ggExtra)
+library(ggbeeswarm)
+library(d3heatmap)
+
+library(gapminder)
+
+library(sf)
+```
+
+# Using the ‘space_launches.csv’ data (I’ll drop this into Slack), create a new .Rmd and create your worst possible graph by customizing (from the ggplot default) in at least **8 ways** - more encouraged - to make it as terrible as possible. - You can plot whatever variable(s) you choose, and make whatever graph type you want.
+- Once you’re done, drop your worst graph (as a .png or .jpg) into the course Slack channel.
+
+```{r}
+space_launches <- read_csv(here("data","space_launches.csv"))
+
+```
+```{r}
+space_plot <- ggplot(data = space_launches,
+                     aes(x = mission, y = launch_year)) +
+              geom_jitter(aes(color = launch_year),
+                          show.legend = FALSE) +
+              scale_color_gradientn(colors = c("chocolate4", "mediumspringgreen", "yellow3", "blueviolet")) +
+  labs(title = "Missions Launched in Year",
+       x = "Mission Title",
+       y = "Launch Year") + 
+  theme(
+    plot.background = element_rect("lawngreen"),
+    title = element_text(color = "orangered"),
+    axis.text.x = element_text(color = "seagreen1", size = 4),
+    axis.text.y = element_text(color = "mediumorchid", size = 16),
+    axis.title = element_text(color = "hotpink", size = 18)
+    )
+
+space_plot  
+
+ggsave(here::here("figs","myworst.png"),
+       height = 5, width = 5)
+
+```
+
+### **Task 2: Wrangling practice with the SF Greenhouse Gas data**
+- Download the San_Francisco_Communitywide_Greenhouse_Gas_Inventory.csv file (I’ll put this in Slack). Information about the data is available here.
+- Read in the SF emissions dataset, then complete the following:
+
+```{r}
+sf_emissions <- read_csv(here("data", "San_Francisco_Communitywide_Greenhouse_Gas_Inventory.csv"))
+
+```
+# Create a summary table of total annual greenhouse gas emissions (only from Emissions_mtCO2e column) by sector_general
+```{r}
+e_annual <- sf_emissions %>% 
+  group_by(Calendar_Year, Sector_General) %>% 
+  summarize(annual_emissions = sum(Emissions_mtCO2e))
+
+```
+# Create a summary table of total annual greenhouse gas emissions (only from Emissions_mtCO2e column) by year and commodity type
+```{r}
+e_yr_type <- sf_emissions %>% 
+  group_by(Calendar_Year, Commodity_Type) %>% 
+  summarize(annual_emissions = sum(Emissions_mtCO2e))
+```
+
+# Create a subset of the data that only contains observations from 2005 on, only for observations where Sector_Detail2 contains the pattern “PG&E”, then limit to columns Calendar_Year, Sector_Detail2 and Emissions_mtCO2e.
+
+```{r}
+e_2005 <- sf_emissions %>% 
+  filter(Calendar_Year > "2005") %>% 
+  select(Calendar_Year, Sector_Detail2, Emissions_mtCO2e) %>% 
+  filter(str_detect(Sector_Detail2, pattern = "PG&E"))
+
+```
+# **Task 3: Do your data viz best**
+- Create a finalized graph (as perfect as you can make it) using the San Francisco GHG emissions dataset. You get to choose what you want to visualize. You can pick which variables & observations you’re interested in. You may want to do some wrangling / summarizing first.
+- Once you’ve decided on what to plot, create the best graph that you can to communicate what’s going on with the data.
+- Once you’re done, drop your best graph (as a .png or .jpg) into the course Slack channel.
+
+```{r}
+sf_emissions <- sf_emissions %>% 
+  clean_names()
+
+sf_e <- sf_emissions %>% 
+  select(calendar_year, sector_general, emissions_mt_co2e) %>% 
+  group_by(calendar_year, sector_general) %>% 
+  summarize(emissions_mt_co2e = sum(emissions_mt_co2e)) %>% 
+  filter(calendar_year != 2019) %>% 
+  mutate(sector_general = fct_reorder(sector_general, emissions_mt_co2e))
+  
+
+```
+
+```{r}
+fancy_scientific <- function(l) {
+  # turn in to character string in scientific notation
+  l <- format(l, scientific = TRUE)
+  # quote the part before the exponent to keep all the digits
+  l <- gsub("^(.*)e", "'\\1'e", l)
+  # turn the 'e+' into plotmath format
+  l <- gsub("e", "%*%10^", l)
+  # return this as an expression
+  parse(text=l)
+}
+```
+
+
+```{r}
+sf_emissions_plot <- sf_e %>% 
+  ggplot(aes(x = calendar_year, y = emissions_mt_co2e, 
+             fill = sector_general)) +
+  geom_area() +
+  scale_x_continuous(breaks = c(1990, 2000, 2010, 2018),
+                     limits = c(1990, 2018)) +
+  scale_y_continuous(labels = fancy_scientific) +
+  labs (title = "Greenhouse Gas Emissions in San Francisco",
+        subtitle = "Source: San Francisco Communitywide Greenhouse Gas Inventory",
+        x = "Year",
+        y = "CO2 Emissions in MegaTons",
+        fill = "Sectors") +
+  theme(
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(size = 8), 
+    panel.grid = element_line(color = "grey98") ,
+    plot.background = element_rect (color = "floralwhite"),
+    axis.text.x = element_text(color = "grey23"),
+    axis.title = element_text(color = "grey10", size = 8, face = "bold"),
+    panel.grid.minor.y = element_blank(),
+    legend.position = "right",
+    legend.title = element_text(face = "bold"),
+    legend.text = element_text(size = 10)
+    ) +
+   scale_fill_paletteer_d(palette = "tvthemes::Stark") 
+    
+sf_emissions_plot
+
+ggsave(here::here("figs","SFemissions_best.png"),
+       height = 8, width = 8)
+```
+
